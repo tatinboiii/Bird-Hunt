@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Realistic Bird Hunting Game</title>
+<style>
+  body {
+    margin: 0;
+    background: linear-gradient(to bottom, #87ceeb, #e0f7fa);
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    user-select: none;
+  }
+  #gameContainer {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+  canvas {
+    display: block;
+    margin: 0 auto;
+    background: transparent;
+  }
+  #ui {
+    position: absolute;
+    top: 10px;
+    width: 100%;
+    text-align: center;
+    color: #222;
+    text-shadow: 1px 1px 3px rgba(255,255,255,0.7);
+    pointer-events: none;
+  }
+  #score {
+    font-size: 2rem;
+    font-weight: 700;
+    pointer-events: auto;
+  }
+  #message {
+    margin-top: 15px;
+    font-size: 1.6rem;
+    color: #b00020;
+    pointer-events: auto;
+  }
+  #restartBtn {
+    margin-top: 15px;
+    padding: 10px 25px;
+    font-size: 1.2rem;
+    background: #2196f3;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    cursor: pointer;
+    pointer-events: auto;
+    display: none;
+    transition: background-color 0.3s;
+  }
+  #restartBtn:hover {
+    background: #1976d2;
+  }
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+  <canvas id="gameCanvas"></canvas>
+  <div id="ui">
+    <div id="score">Score: 0</div>
+    <div id="message"></div>
+    <button id="restartBtn">Restart Game</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const scoreElem = document.getElementById('score');
+  const messageElem = document.getElementById('message');
+  const restartBtn = document.getElementById('restartBtn');
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  class Bird {
+    constructor() {
+      this.reset();
+    }
+
+    reset() {
+      this.x = -80;
+      this.y = Math.random() * (canvas.height * 0.6) + canvas.height * 0.2;
+      this.speed = 2 + Math.random() * 2;
+      this.wingFlap = 0;
+      this.wingFlapSpeed = 0.15 + Math.random() * 0.1;
+      this.width = 70;
+      this.height = 50;
+      this.alive = true;
+    }
+
+    update() {
+      this.x += this.speed;
+      this.wingFlap += this.wingFlapSpeed;
+      if (this.wingFlap > Math.PI * 2) this.wingFlap -= Math.PI * 2;
+    }
+
+    draw(ctx) {
+      if (!this.alive) return;
+
+      ctx.save();
+      ctx.translate(this.x, this.y);
+
+      // Body (torpedo shaped)
+      ctx.fillStyle = '#6B4C3B';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, this.width * 0.4, this.height * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Head (circle)
+      ctx.fillStyle = '#705B49';
+      ctx.beginPath();
+      ctx.arc(this.width * 0.35, -this.height * 0.1, this.width * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Beak (triangle)
+      ctx.fillStyle = '#F4A261';
+      ctx.beginPath();
+      ctx.moveTo(this.width * 0.55, -this.height * 0.1);
+      ctx.lineTo(this.width * 0.75, -this.height * 0.05);
+      ctx.lineTo(this.width * 0.55, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Tail feathers (three triangles)
+      ctx.fillStyle = '#5B3E26';
+      const tailBaseX = -this.width * 0.35;
+      const tailBaseY = 0;
+      const tailSize = this.height * 0.4;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(tailBaseX, tailBaseY);
+        ctx.lineTo(tailBaseX - tailSize * 0.6, tailBaseY - tailSize * 0.3 + i * 10);
+        ctx.lineTo(tailBaseX - tailSize * 0.6, tailBaseY - tailSize * 0.1 + i * 10);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Wings with natural flapping motion
+      const flap = Math.sin(this.wingFlap) * 30;
+
+      // Left wing
+      ctx.fillStyle = '#A9746E';
+      ctx.beginPath();
+      ctx.moveTo(-this.width * 0.05, 0);
+      ctx.quadraticCurveTo(
+        -this.width * 0.6,
+        flap - this.height * 0.1,
+        -this.width * 0.7,
+        flap + this.height * 0.1
+      );
+      ctx.quadraticCurveTo(
+        -this.width * 0.3,
+        flap + this.height * 0.25,
+        -this.width * 0.05,
+        0
+      );
+      ctx.fill();
+
+      // Right wing
+      ctx.beginPath();
+      ctx.moveTo(this.width * 0.1, 0);
+      ctx.quadraticCurveTo(
+        this.width * 0.6,
+        -flap - this.height * 0.1,
+        this.width * 0.75,
+        -flap + this.height * 0.1
+      );
+      ctx.quadraticCurveTo(
+        this.width * 0.35,
+        -flap + this.height * 0.25,
+        this.width * 0.1,
+        0
+      );
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    isHit(x, y) {
+      return this.alive &&
+             x >= this.x - this.width * 0.5 &&
+             x <= this.x + this.width * 0.8 &&
+             y >= this.y - this.height * 0.6 &&
+             y <= this.y + this.height * 0.6;
+    }
+  }
+
+  let birds = [];
+  const maxBirds = 3;
+  let score = 0;
+  let gameOver = false;
+
+  function createBirds() {
+    birds = [];
+    for (let i = 0; i < maxBirds; i++) {
+      const b = new Bird();
+      b.x -= i * 250; // spacing them horizontally
+      birds.push(b);
+    }
+  }
+
+  function resetGame() {
+    score = 0;
+    scoreElem.textContent = `Score: ${score}`;
+    messageElem.textContent = '';
+    restartBtn.style.display = 'none';
+    gameOver = false;
+    createBirds();
+    animate();
+  }
+
+  function clear() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function animate() {
+    if (gameOver) return;
+    clear();
+
+    let allOffScreen = true;
+
+    birds.forEach(bird => {
+      if (bird.alive) {
+        bird.update();
+        bird.draw(ctx);
+
+        if (bird.x < canvas.width + bird.width) {
+          allOffScreen = false;
+        }
+      }
+    });
+
+    if (allOffScreen) {
+      endGame("Game Over! You missed the birds.");
+      return;
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  function endGame(msg) {
+    gameOver = true;
+    messageElem.textContent = msg;
+    restartBtn.style.display = 'inline-block';
+  }
+
+  canvas.addEventListener('click', (event) => {
+    if (gameOver) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+
+    for (const bird of birds) {
+      if (bird.isHit(clickX, clickY)) {
+        bird.alive = false;
+        score++;
+        scoreElem.textContent = `Score: ${score}`;
+
+        // Spawn new bird after 1 sec delay
+        setTimeout(() => {
+          if (!gameOver) {
+            const newBird = new Bird();
+            newBird.x = -80;
+            birds.push(newBird);
+            if (birds.length > maxBirds) {
+              birds.shift();
+            }
+            if (!gameOver) animate();
+          }
+        }, 1000);
+
+        break; // one bird per click only
+      }
+    }
+  });
+
+  restartBtn.addEventListener('click', () => {
+    resetGame();
+  });
+
+  resetGame();
+
+})();
+</script>
+
+</body>
+</html>
